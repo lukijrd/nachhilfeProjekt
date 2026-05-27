@@ -3,14 +3,14 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-url = "https://mjxwrvgemzlgomliwmwr.supabase.co"
-publishable_key = "sb_publishable_dg4lCzwM1mdoH16HRmbjKw_ouDEDlHe"
+SUPABASE_URL= "https://mtjpvnnqmnehapcvifdv.supabase.co"
+SUPABASE_KEY= "sb_publishable_db9KPKVXQn6IB5uqAas28Q_98UA5fXn"
 
-supabase = create_client(url, publishable_key)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 
 
 if __name__ == '__main__':
-    print("Starting PetBuddy API...")
+    print("Starting Nachhilfe API...")
     app.run(debug=True)
