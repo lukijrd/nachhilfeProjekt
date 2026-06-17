@@ -1,79 +1,107 @@
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
+import sqlite3
 
 app = Flask(__name__)
 
-SUPABASE_URL= "https://mtjpvnnqmnehapcvifdv.supabase.co"
-SUPABASE_KEY= "sb_publishable_db9KPKVXQn6IB5uqAas28Q_98UA5fXn"
 url = "https://mtjpvnnqmnehapcvifdv.supabase.co"
 publishable_key = "sb_publishable_db9KPKVXQn6IB5uqAas28Q_98UA5fXn"
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(url, publishable_key)
 
-@app.route('/schueler', methods=['GET'])
-def get_schueler():
-    schueler = supabase.table('schueler').select('*').execute()
-    return jsonify(schueler.data)
+conn = sqlite3.connect('faecher.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS faecher
+             (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)''')
+conn.commit()
+conn.close()
 
-@app.route('/schueler', methods=['POST'])
-def add_schueler():
-    data = request.get_json()
+faecher = []
+
+class Faecher:
+    def __init__(self, name):
+        self.name = name
+        conn = sqlite3.connect('faecher.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO faecher (name) VALUES (?)", (name,))
+        conn.commit()
+        conn.close()
+
+@app.route('/show_faecher', methods=['GET'])
+def show_faecher():
+    conn = sqlite3.connect('faecher.db')
+    c = conn.cursor()
+    c.execute("SELECT name FROM faecher")
+    faecher = c.fetchall()
+    conn.close()
+    return {'faecher': [f[0] for f in faecher]}
+
+@app.route('/add_fach', methods=['POST'])
+def add_fach():
+
+    data = request.get_json(force=True, silent=True)
+
+    print(data)   # DEBUG
+
+    if data is None or not isinstance(data, dict):
+        return {'message': 'Invalid JSON received'}, 400
+
     name = data.get('name')
-    geburtsdatum = data.get('geburtsdatum')
-    email = data.get('email')
-    faecher = data.get('faecher')
 
-    if not name or not geburtsdatum or not email or not faecher:
-        return jsonify({'error': 'Name, Geburtsdatum, E-Mail und Fächer sind erforderlich'}), 400
+    if not name:
+        return {'message': 'Name is required'}, 400
 
-    new_schueler = {
-        'name': name,
-        'geburtsdatum': geburtsdatum,
-        'email': email,
-        'faecher': faecher
-    }
+    Faecher(name)
 
-    result = supabase.table('schueler').insert(new_schueler).execute()
+    return {'message': 'Fach added successfully'}, 201
 
-    if result.status_code == 201:
-        return jsonify({'message': 'Schüler erfolgreich hinzugefügt'}), 201
-    else:
-        return jsonify({'error': 'Fehler beim Hinzufügen des Schülers'}), 500
+@app.route('/update_fach/<int:id>', methods=['PUT'])
+def update_fach(id):
 
-@app.route('/schueler/<name>', methods=['DELETE'])
-def delete_schueler(name):
-    result = supabase.table('schueler').delete().eq('name', name).execute()
-
-    if result.status_code == 204:
-        return jsonify({'message': 'Schüler erfolgreich gelöscht'}), 204
-    else:
-        return jsonify({'error': 'Fehler beim Löschen des Schülers'}), 500
-
-@app.route('/schueler/<name>', methods=['PUT'])
-def update_schueler(name):
     data = request.get_json()
-    geburtsdatum = data.get('geburtsdatum')
-    email = data.get('email')
-    faecher = data.get('faecher')
 
-    if not geburtsdatum and not email and not faecher:
-        return jsonify({'error': 'Mindestens ein Feld (Geburtsdatum, E-Mail oder Fächer) muss aktualisiert werden'}), 400
+    if not data:
+        return {'message': 'No JSON data provided'}, 400
 
-    update_data = {}
-    if geburtsdatum:
-        update_data['geburtsdatum'] = geburtsdatum
-    if email:
-        update_data['email'] = email
-    if faecher:
-        update_data['faecher'] = faecher
+    new_name = data.get('name')
 
-    result = supabase.table('schueler').update(update_data).eq('name', name).execute()
+    if not new_name:
+        return {'message': 'New name is required'}, 400
 
-    if result.status_code == 200:
-        return jsonify({'message': 'Schüler erfolgreich aktualisiert'}), 200
-    else:
-        return jsonify({'error': 'Fehler beim Aktualisieren des Schülers'}), 500
-    
+    conn = sqlite3.connect('faecher.db')
+    c = conn.cursor()
+
+    c.execute(
+        "UPDATE faecher SET name = ? WHERE id = ?",
+        (new_name, id)
+    )
+
+    conn.commit()
+
+    if c.rowcount == 0:
+        conn.close()
+        return {'message': 'Fach not found'}, 404
+
+    conn.close()
+
+    return {'message': 'Fach updated successfully'}
+
+
+@app.route('/delete_fach/<int:id>', methods=['DELETE'])
+def delete_fach(id):
+    conn = sqlite3.connect('faecher.db')
+    c = conn.cursor()
+
+    c.execute(
+        "DELETE FROM faecher WHERE id = ?",
+        (id,)
+    )
+    conn.commit()
+    if c.rowcount == 0:
+        conn.close()
+        return {'message': 'Fach not found'}, 404
+    conn.close()
+    return {'message': 'Fach deleted successfully'}
 
 
 if __name__ == '__main__':
